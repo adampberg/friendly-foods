@@ -17,8 +17,10 @@ const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-change-me'
 app.use(cors())
 app.use(express.json())
 
-// Serve built frontend in production
-app.use(express.static(join(__dirname, 'dist')))
+// Serve built frontend in production (local only — Vercel handles this via CDN)
+if (!process.env.VERCEL) {
+  app.use(express.static(join(__dirname, 'dist')))
+}
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -50,7 +52,7 @@ app.post('/api/auth/register', async (req, res) => {
     return res.status(400).json({ error: 'Password must be at least 6 characters.' })
   }
 
-  const db = readDb()
+  const db = await readDb()
   const existing = db.users.find(u => u.email.toLowerCase() === email.toLowerCase())
   if (existing) {
     return res.status(409).json({ error: 'An account with that email already exists.' })
@@ -65,7 +67,7 @@ app.post('/api/auth/register', async (req, res) => {
     createdAt: new Date().toISOString(),
   }
   db.users.push(user)
-  writeDb(db)
+  await writeDb(db)
 
   const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '30d' })
   res.status(201).json({
@@ -80,7 +82,7 @@ app.post('/api/auth/login', async (req, res) => {
     return res.status(400).json({ error: 'Email and password are required.' })
   }
 
-  const db = readDb()
+  const db = await readDb()
   const user = db.users.find(u => u.email.toLowerCase() === email.toLowerCase().trim())
   if (!user) {
     return res.status(401).json({ error: 'Invalid email or password.' })
@@ -100,19 +102,19 @@ app.post('/api/auth/login', async (req, res) => {
 
 // ─── Profile routes ────────────────────────────────────────────────────────────
 
-app.get('/api/profiles', requireAuth, (req, res) => {
-  const db = readDb()
+app.get('/api/profiles', requireAuth, async (req, res) => {
+  const db = await readDb()
   const profiles = db.profiles.filter(p => p.userId === req.userId)
   res.json(profiles)
 })
 
-app.post('/api/profiles', requireAuth, (req, res) => {
+app.post('/api/profiles', requireAuth, async (req, res) => {
   const { name, allergens } = req.body
   if (!name || !name.trim()) {
     return res.status(400).json({ error: 'Profile name is required.' })
   }
 
-  const db = readDb()
+  const db = await readDb()
   const profile = {
     id: randomUUID(),
     userId: req.userId,
@@ -121,13 +123,13 @@ app.post('/api/profiles', requireAuth, (req, res) => {
     createdAt: new Date().toISOString(),
   }
   db.profiles.push(profile)
-  writeDb(db)
+  await writeDb(db)
   res.status(201).json(profile)
 })
 
-app.put('/api/profiles/:id', requireAuth, (req, res) => {
+app.put('/api/profiles/:id', requireAuth, async (req, res) => {
   const { name, allergens } = req.body
-  const db = readDb()
+  const db = await readDb()
   const idx = db.profiles.findIndex(p => p.id === req.params.id && p.userId === req.userId)
   if (idx === -1) {
     return res.status(404).json({ error: 'Profile not found.' })
@@ -135,32 +137,32 @@ app.put('/api/profiles/:id', requireAuth, (req, res) => {
   if (name !== undefined) db.profiles[idx].name = name.trim()
   if (allergens !== undefined) db.profiles[idx].allergens = Array.isArray(allergens) ? allergens : []
   db.profiles[idx].updatedAt = new Date().toISOString()
-  writeDb(db)
+  await writeDb(db)
   res.json(db.profiles[idx])
 })
 
-app.delete('/api/profiles/:id', requireAuth, (req, res) => {
-  const db = readDb()
+app.delete('/api/profiles/:id', requireAuth, async (req, res) => {
+  const db = await readDb()
   const idx = db.profiles.findIndex(p => p.id === req.params.id && p.userId === req.userId)
   if (idx === -1) {
     return res.status(404).json({ error: 'Profile not found.' })
   }
   db.profiles.splice(idx, 1)
-  writeDb(db)
+  await writeDb(db)
   res.json({ ok: true })
 })
 
 // ─── Saved recipes routes ──────────────────────────────────────────────────────
 
-app.get('/api/saved-recipes', requireAuth, (req, res) => {
-  const db = readDb()
+app.get('/api/saved-recipes', requireAuth, async (req, res) => {
+  const db = await readDb()
   const recipes = db.savedRecipes
     .filter(r => r.userId === req.userId)
     .map(({ userId, ...rest }) => rest)   // strip userId before sending
   res.json(recipes)
 })
 
-app.post('/api/saved-recipes', requireAuth, (req, res) => {
+app.post('/api/saved-recipes', requireAuth, async (req, res) => {
   const { title, recipe } = req.body
   if (!title || !title.trim()) {
     return res.status(400).json({ error: 'Title is required.' })
@@ -169,7 +171,7 @@ app.post('/api/saved-recipes', requireAuth, (req, res) => {
     return res.status(400).json({ error: 'Recipe data is required.' })
   }
 
-  const db = readDb()
+  const db = await readDb()
   const entry = {
     id: randomUUID(),
     userId: req.userId,
@@ -178,19 +180,19 @@ app.post('/api/saved-recipes', requireAuth, (req, res) => {
     recipe,
   }
   db.savedRecipes.push(entry)
-  writeDb(db)
+  await writeDb(db)
 
   const { userId, ...response } = entry
   res.status(201).json(response)
 })
 
-app.put('/api/saved-recipes/:id', requireAuth, (req, res) => {
+app.put('/api/saved-recipes/:id', requireAuth, async (req, res) => {
   const { title } = req.body
   if (!title || !title.trim()) {
     return res.status(400).json({ error: 'Title is required.' })
   }
 
-  const db = readDb()
+  const db = await readDb()
   const idx = db.savedRecipes.findIndex(r => r.id === req.params.id && r.userId === req.userId)
   if (idx === -1) {
     return res.status(404).json({ error: 'Saved recipe not found.' })
@@ -198,20 +200,20 @@ app.put('/api/saved-recipes/:id', requireAuth, (req, res) => {
 
   db.savedRecipes[idx].title = title.trim()
   db.savedRecipes[idx].updatedAt = new Date().toISOString()
-  writeDb(db)
+  await writeDb(db)
 
   const { userId, ...response } = db.savedRecipes[idx]
   res.json(response)
 })
 
-app.delete('/api/saved-recipes/:id', requireAuth, (req, res) => {
-  const db = readDb()
+app.delete('/api/saved-recipes/:id', requireAuth, async (req, res) => {
+  const db = await readDb()
   const idx = db.savedRecipes.findIndex(r => r.id === req.params.id && r.userId === req.userId)
   if (idx === -1) {
     return res.status(404).json({ error: 'Saved recipe not found.' })
   }
   db.savedRecipes.splice(idx, 1)
-  writeDb(db)
+  await writeDb(db)
   res.json({ ok: true })
 })
 
@@ -236,12 +238,12 @@ app.post('/api/recipe', async (req, res) => {
 
   // Check cache unless force-refresh was requested
   if (!force) {
-    const db = readDb()
+    const db = await readDb()
     const cached = db.recipeCache.find(c => c.cacheKey === cacheKey)
     if (cached) {
       cached.hitCount = (cached.hitCount || 0) + 1
       db.stats.cacheHits = (db.stats.cacheHits || 0) + 1
-      writeDb(db)
+      await writeDb(db)
       console.log(`Cache hit: "${meal}"`)
       return res.json({ ...cached.recipe, _fromCache: true })
     }
@@ -299,7 +301,7 @@ Important rules:
     const recipe = JSON.parse(content)
 
     // Save/update cache entry and increment API call counter
-    const db = readDb()
+    const db = await readDb()
     const existingIdx = db.recipeCache.findIndex(c => c.cacheKey === cacheKey)
     const entry = {
       id: existingIdx >= 0 ? db.recipeCache[existingIdx].id : randomUUID(),
@@ -317,7 +319,7 @@ Important rules:
       db.recipeCache.push(entry)
     }
     db.stats.apiCalls = (db.stats.apiCalls || 0) + 1
-    writeDb(db)
+    await writeDb(db)
 
     console.log(`API call: "${meal}" — cache now has ${db.recipeCache.length} entries`)
     res.json({ ...recipe, _fromCache: false })
@@ -335,14 +337,14 @@ Important rules:
 
 // ─── Admin routes ──────────────────────────────────────────────────────────────
 
-app.get('/api/admin/stats', (req, res) => {
+app.get('/api/admin/stats', async (req, res) => {
   const adminToken = process.env.ADMIN_TOKEN
   const auth = req.headers.authorization
   if (!adminToken || auth !== `Bearer ${adminToken}`) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 
-  const db = readDb()
+  const db = await readDb()
   const apiCalls = db.stats?.apiCalls ?? 0
   const cacheHits = db.stats?.cacheHits ?? 0
   const total = apiCalls + cacheHits
@@ -359,11 +361,18 @@ app.get('/api/admin/stats', (req, res) => {
   })
 })
 
-// Fallback to index.html for SPA routing in production
-app.get('*', (req, res) => {
-  res.sendFile(join(__dirname, 'dist', 'index.html'))
-})
+// Fallback to index.html for SPA routing in production (local only)
+if (!process.env.VERCEL) {
+  app.get('*', (req, res) => {
+    res.sendFile(join(__dirname, 'dist', 'index.html'))
+  })
+}
 
-app.listen(PORT, () => {
-  console.log(`Friendly Foods server running on http://localhost:${PORT}`)
-})
+// Start server locally; Vercel manages its own listener
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`Friendly Foods server running on http://localhost:${PORT}`)
+  })
+}
+
+export default app

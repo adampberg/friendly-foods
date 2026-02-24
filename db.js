@@ -1,30 +1,41 @@
-import { readFileSync, writeFileSync, existsSync } from 'fs'
-import { join, dirname } from 'path'
-import { fileURLToPath } from 'url'
+import { MongoClient } from 'mongodb'
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const DB_PATH = join(__dirname, 'data.json')
-const DEFAULT_DB = { users: [], profiles: [], savedRecipes: [], recipeCache: [], stats: { apiCalls: 0, cacheHits: 0 } }
+const DEFAULT_DB = {
+  users: [],
+  profiles: [],
+  savedRecipes: [],
+  recipeCache: [],
+  stats: { apiCalls: 0, cacheHits: 0 },
+}
 
-export function readDb() {
-  if (!existsSync(DB_PATH)) {
-    writeFileSync(DB_PATH, JSON.stringify(DEFAULT_DB, null, 2))
-    return { ...DEFAULT_DB, users: [], profiles: [] }
-  }
-  try {
-    const data = JSON.parse(readFileSync(DB_PATH, 'utf-8'))
-    return {
-      users: data.users ?? [],
-      profiles: data.profiles ?? [],
-      savedRecipes: data.savedRecipes ?? [],
-      recipeCache: data.recipeCache ?? [],
-      stats: data.stats ?? { apiCalls: 0, cacheHits: 0 },
+let cachedClient = null
+
+async function getCollection() {
+  if (!cachedClient) {
+    if (!process.env.MONGODB_URI) {
+      throw new Error('MONGODB_URI environment variable is not set')
     }
-  } catch {
-    return { users: [], profiles: [], savedRecipes: [], recipeCache: [], stats: { apiCalls: 0, cacheHits: 0 } }
+    cachedClient = new MongoClient(process.env.MONGODB_URI)
+    await cachedClient.connect()
+  }
+  return cachedClient.db('friendly-foods').collection('appdata')
+}
+
+export async function readDb() {
+  const col = await getCollection()
+  const doc = await col.findOne({ _id: 'main' })
+  if (!doc) return { ...DEFAULT_DB }
+  const { _id, ...data } = doc
+  return {
+    users: data.users ?? [],
+    profiles: data.profiles ?? [],
+    savedRecipes: data.savedRecipes ?? [],
+    recipeCache: data.recipeCache ?? [],
+    stats: data.stats ?? { apiCalls: 0, cacheHits: 0 },
   }
 }
 
-export function writeDb(data) {
-  writeFileSync(DB_PATH, JSON.stringify(data, null, 2))
+export async function writeDb(data) {
+  const col = await getCollection()
+  await col.replaceOne({ _id: 'main' }, { _id: 'main', ...data }, { upsert: true })
 }
