@@ -1,0 +1,422 @@
+.form-card {
+  background: var(--white);
+  border-radius: var(--radius-xl);
+  padding: 36px 36px 32px;
+  margin-top: 32px;
+  box-shadow: var(--shadow-xl);
+  border: 1.5px solid var(--green-100);
+}
+
+.form-header {
+  margin-bottom: 32px;
+}
+
+.form-header h2 {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--gray-900);
+  margin-bottom: 8px;
+  line-height: 1.2;
+}
+
+.form-header p {
+  color: var(--gray-500);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+/* Field Groups */
+.field-group {
+  margin-bottom: 26px;
+}
+
+.field-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--gray-700);
+  margin-bottom: 10px;
+}
+
+.label-icon {
+  font-size: 1rem;
+}
+
+.field-hint {
+  margin-left: auto;
+  font-weight: 400;
+  font-size: 0.78rem;
+  color: var(--gray-400);
+  font-family: 'Lato', sans-serif;
+}
+
+/* Meal Input */
+.meal-input {
+  width: 100%;
+  padding: 14px 18px;
+  border: 2px solid var(--gray-200);
+  border-radius: var(--radius-md);
+  font-size: 1rem;
+  color: var(--gray-800);
+  background: var(--gray-50);
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
+
+.meal-input::placeholder {
+  color: var(--gray-400);
+}
+
+.meal-input:focus {
+  border-color: var(--green-500);
+  background: var(--white);
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.1);
+}
+
+.meal-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Allergen Quick Buttons */
+.allergen-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.allergen-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 14px;
+  border-radius: var(--radius-full);
+  font-size: 0.88rem;
+  font-weight: 700;
+  background: var(--gray-50);
+  color: var(--gray-600);
+  border: 2px solid var(--gray-200);
+  transition: all 0.18s ease;
+  user-select: none;
+}
+
+.allergen-pill:hover:not(:disabled) {
+  background: var(--green-50);
+  border-color: var(--green-300);
+  color: var(--green-700);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.allergen-pill.active {
+  background: var(--green-500);
+  border-color: var(--green-500);
+  color: white;
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.35);
+}
+
+.allergen-pill.active:hover:not(:disabled) {
+  background: var(--green-600);
+  border-color: var(--green-600);
+  transform: translateY(-1px);
+}
+
+.allergen-pill:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.pill-check {
+  font-size: 0.8rem;
+  margin-left: 2px;
+}
+
+/* Side-by-side avoid row */
+.avoid-row {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  margin-bottom: 26px;
+}
+
+.avoid-row .field-group {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+/* Tags Input */
+.tags-input-wrapper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 10px 14px;
+  border: 2px solid var(--gray-200);
+  border-radius: var(--radius-md);
+  background: var(--gray-50);
+  min-height: 54px;
+  cursor: text;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+  align-items: center;
+}
+
+.tags-input-wrapper:focus-within {
+  border-color: var(--green-500);
+  background: var(--white);
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.1);
+}
+
+.tags-input-wrapper.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--orange-100);
+  color: var(--orange-600);
+  border: 1.5px solid var(--orange-400);
+  border-radius: var(--radius-full);
+  padding: 4px 10px 4px 12px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  font-family: 'Nunito', sans-serif;
+  white-space: nowrap;
+  animation: tag-pop 0.15s ease;
+}
+
+@keyframes tag-pop {
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.tag-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1;
+  background: transparent;
+  color: var(--orange-500);
+  border: none;
+  padding: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.tag-remove:hover {
+  background: var(--orange-500);
+  color: white;
+}
+
+.tag-remove:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.tag-text-input {
+  flex: 1;
+  min-width: 180px;
+  border: none;
+  background: transparent;
+  font-size: 0.95rem;
+  color: var(--gray-800);
+  padding: 2px 4px;
+}
+
+.tag-text-input::placeholder {
+  color: var(--gray-400);
+}
+
+.tag-text-input:disabled {
+  cursor: not-allowed;
+}
+
+.tags-empty-hint {
+  font-size: 0.8rem;
+  color: var(--gray-400);
+  margin-top: 7px;
+  font-style: italic;
+}
+
+/* Allergen Profile Section */
+.profile-section {
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profile-banner {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #f0fdf4;
+  border: 1.5px solid #86efac;
+  border-radius: var(--radius-full);
+  padding: 6px 14px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  font-family: 'Nunito', sans-serif;
+  color: #15803d;
+  align-self: flex-start;
+}
+
+.profile-banner-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #16a34a;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.25);
+}
+
+.profile-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.profile-action-btn {
+  font-family: 'Nunito', sans-serif;
+  font-weight: 700;
+  font-size: 0.875rem;
+  border-radius: var(--radius-md);
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  border: none;
+}
+
+.profile-action-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.profile-action-btn--save {
+  background: var(--green-500);
+  color: white;
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3);
+}
+
+.profile-action-btn--save:hover {
+  background: var(--green-600);
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
+}
+
+.profile-action-btn--update {
+  background: #f97316;
+  color: white;
+  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.3);
+}
+
+.profile-action-btn--update:hover {
+  background: #ea580c;
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.4);
+}
+
+.profile-action-btn--clear {
+  background: transparent;
+  color: var(--gray-500);
+  border: 1.5px solid var(--gray-300);
+}
+
+.profile-action-btn--clear:hover {
+  background: var(--gray-50);
+  border-color: var(--gray-400);
+  color: var(--gray-700);
+  box-shadow: none;
+}
+
+/* Submit Button */
+.submit-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px 28px;
+  margin-top: 8px;
+  background: linear-gradient(135deg, var(--green-500) 0%, var(--green-600) 100%);
+  color: white;
+  border-radius: var(--radius-lg);
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  box-shadow: 0 4px 14px rgba(22, 163, 74, 0.4);
+  transition: all 0.2s ease;
+}
+
+.submit-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--green-600) 0%, var(--green-700) 100%);
+  box-shadow: 0 6px 18px rgba(22, 163, 74, 0.5);
+  transform: translateY(-1px);
+}
+
+.submit-btn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.4);
+}
+
+.submit-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2.5px solid rgba(255,255,255,0.4);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 600px) {
+  .avoid-row {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .avoid-row .field-group {
+    margin-bottom: 26px;
+  }
+
+  .form-card {
+    padding: 24px 18px 20px;
+    margin-top: 20px;
+    border-radius: var(--radius-lg);
+  }
+
+  .form-header h2 {
+    font-size: 1.3rem;
+  }
+
+  .allergen-pill {
+    font-size: 0.82rem;
+    padding: 7px 11px;
+  }
+
+  .submit-btn {
+    font-size: 1rem;
+    padding: 14px 20px;
+  }
+
+  .tag-text-input {
+    min-width: 120px;
+  }
+}

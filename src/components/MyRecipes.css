@@ -1,0 +1,250 @@
+.my-recipes {
+  padding-top: 32px;
+}
+
+.my-recipes-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.my-recipes-header h2 {
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: var(--gray-900);
+}
+
+.my-recipes-count {
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-family: 'Nunito', sans-serif;
+  color: var(--gray-400);
+}
+
+/* Empty state */
+.my-recipes-empty {
+  text-align: center;
+  padding: 64px 24px;
+  background: var(--white);
+  border-radius: var(--radius-xl);
+  border: 1.5px dashed var(--gray-200);
+}
+
+.my-recipes-empty-icon {
+  font-size: 3rem;
+  display: block;
+  margin-bottom: 16px;
+}
+
+.my-recipes-empty h3 {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--gray-700);
+  margin-bottom: 8px;
+}
+
+.my-recipes-empty p {
+  font-size: 0.92rem;
+  color: var(--gray-400);
+  max-width: 320px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+/* Cards grid */
+.my-recipes-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.recipe-saved-card {
+  display: flex;
+  align-items: stretch;
+  background: var(--white);
+  border: 1.5px solid var(--gray-100);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  transition: transform 0.2s ease, opacity 0.3s ease, box-shadow 0.2s ease;
+  animation: card-in 0.25s ease;
+}
+
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.recipe-saved-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+  border-color: var(--green-200);
+}
+
+.recipe-saved-card.deleting {
+  opacity: 0;
+  transform: translateX(20px);
+}
+
+.recipe-saved-card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 18px 20px;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font-weight: 400;
+  font-family: 'Lato', sans-serif;
+}
+
+.recipe-saved-card-body:hover .recipe-saved-card-title {
+  color: var(--green-700);
+}
+
+.recipe-saved-card-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  font-family: 'Nunito', sans-serif;
+  color: var(--gray-900);
+  transition: color 0.15s;
+  line-height: 1.3;
+}
+
+.recipe-saved-card-meta {
+  font-size: 0.82rem;
+  color: var(--gray-400);
+  font-weight: 400;
+}
+
+.rename-input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1.5px solid var(--green-400);
+  border-radius: var(--radius-sm);
+  font-size: 1rem;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 800;
+  color: var(--gray-900);
+  background: var(--green-50);
+  outline: none;
+}
+
+/* Card action buttons */
+.recipe-saved-card-actions {
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--gray-100);
+}
+
+.card-action-btn {
+  flex: 1;
+  width: 48px;
+  background: none;
+  border: none;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.card-rename-btn {
+  border-bottom: 1px solid var(--gray-100);
+  color: var(--gray-500);
+}
+
+.card-rename-btn:hover {
+  background: var(--green-50);
+}
+
+.card-delete-btn {
+  font-size: 1.3rem;
+  color: var(--gray-400);
+}
+
+.card-delete-btn:hover {
+  background: var(--red-50);
+  color: var(--red-500);
+}
+
+/* Detail view */
+.my-recipes-detail {
+  padding-top: 24px;
+}
+
+.my-recipes-detail-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+
+.back-btn {
+  background: none;
+  border: 1.5px solid var(--gray-200);
+  border-radius: var(--radius-full);
+  padding: 8px 16px;
+  font-size: 0.88rem;
+  color: var(--gray-600);
+  font-weight: 700;
+  font-family: 'Nunito', sans-serif;
+  transition: all 0.15s;
+}
+
+.back-btn:hover {
+  background: var(--gray-100);
+  border-color: var(--gray-300);
+  color: var(--gray-800);
+}
+
+.detail-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.detail-saved-date {
+  font-size: 0.82rem;
+  color: var(--gray-400);
+  font-weight: 400;
+}
+
+.detail-delete-btn {
+  background: var(--red-50);
+  border: 1.5px solid var(--red-100);
+  border-radius: var(--radius-full);
+  padding: 8px 16px;
+  font-size: 0.88rem;
+  color: var(--red-600);
+  font-weight: 700;
+  font-family: 'Nunito', sans-serif;
+  transition: all 0.15s;
+}
+
+.detail-delete-btn:hover {
+  background: var(--red-100);
+  border-color: var(--red-500);
+}
+
+@media (max-width: 600px) {
+  .my-recipes-detail-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .detail-toolbar-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .card-action-btn {
+    width: 44px;
+  }
+}
