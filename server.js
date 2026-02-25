@@ -252,6 +252,26 @@ app.get('/api/health', (req, res) => {
   })
 })
 
+// ─── DB test endpoint ───────────────────────────────────────────────────────────
+
+app.get('/api/db-test', async (req, res) => {
+  const start = Date.now()
+  try {
+    const db = await readDb()
+    res.json({
+      connected: true,
+      userCount: db.users.length,
+      durationMs: Date.now() - start,
+    })
+  } catch (err) {
+    res.status(500).json({
+      connected: false,
+      error: err.message,
+      durationMs: Date.now() - start,
+    })
+  }
+})
+
 // ─── Recipe route ──────────────────────────────────────────────────────────────
 
 app.post('/api/recipe', async (req, res) => {
