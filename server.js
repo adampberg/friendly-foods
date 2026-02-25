@@ -225,6 +225,17 @@ function makeCacheKey(meal, allergens) {
   return `${normalizedMeal}|${sortedAllergens}`
 }
 
+// ─── Health endpoint ────────────────────────────────────────────────────────────
+
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    anthropicKeySet: !!process.env.ANTHROPIC_API_KEY,
+    mongodbUriSet: !!process.env.MONGODB_URI,
+    timestamp: new Date().toISOString(),
+  })
+})
+
 // ─── Recipe route ──────────────────────────────────────────────────────────────
 
 app.post('/api/recipe', async (req, res) => {
@@ -234,21 +245,35 @@ app.post('/api/recipe', async (req, res) => {
     return res.status(400).json({ error: 'Meal name is required.' })
   }
 
+  // Fail fast with a clear JSON error if the API key is missing
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.error('ANTHROPIC_API_KEY is not set')
+    return res.status(503).json({ error: 'Server configuration error: Anthropic API key is not configured.' })
+  }
+
   const cacheKey = makeCacheKey(meal, avoidList)
 
-  // Check cache unless force-refresh was requested
+  // Check cache unless force-refresh was requested.
+  // Wrapped in try/catch so a DB failure doesn't crash the request before
+  // SSE headers are sent (which would cause Express to return an HTML error
+  // page that the client can't parse as JSON).
   if (!force) {
-    const db = await readDb()
-    const cached = db.recipeCache.find(c => c.cacheKey === cacheKey)
-    if (cached) {
-      cached.hitCount = (cached.hitCount || 0) + 1
-      db.stats.cacheHits = (db.stats.cacheHits || 0) + 1
-      await writeDb(db)
-      console.log(`Cache hit: "${meal}"`)
-      res.setHeader('Content-Type', 'text/event-stream')
-      res.setHeader('Cache-Control', 'no-cache')
-      res.write(`data: ${JSON.stringify({ done: true, recipe: cached.recipe, _fromCache: true })}\n\n`)
-      return res.end()
+    try {
+      const db = await readDb()
+      const cached = db.recipeCache.find(c => c.cacheKey === cacheKey)
+      if (cached) {
+        cached.hitCount = (cached.hitCount || 0) + 1
+        db.stats.cacheHits = (db.stats.cacheHits || 0) + 1
+        await writeDb(db)
+        console.log(`Cache hit: "${meal}"`)
+        res.setHeader('Content-Type', 'text/event-stream')
+        res.setHeader('Cache-Control', 'no-cache')
+        res.write(`data: ${JSON.stringify({ done: true, recipe: cached.recipe, _fromCache: true })}\n\n`)
+        return res.end()
+      }
+    } catch (dbErr) {
+      console.error('DB error during cache check, proceeding without cache:', dbErr.message)
+      // Fall through — generate the recipe without a cache hit
     }
   }
 
@@ -317,28 +342,31 @@ Important rules:
 
     const recipe = JSON.parse(content)
 
-    // Save/update cache entry and increment API call counter
-    const db = await readDb()
-    const existingIdx = db.recipeCache.findIndex(c => c.cacheKey === cacheKey)
-    const entry = {
-      id: existingIdx >= 0 ? db.recipeCache[existingIdx].id : randomUUID(),
-      cacheKey,
-      meal: meal.trim(),
-      allergens: avoidList || [],
-      recipe,
-      createdAt: existingIdx >= 0 ? db.recipeCache[existingIdx].createdAt : new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      hitCount: existingIdx >= 0 ? (db.recipeCache[existingIdx].hitCount || 0) : 0,
+    // Save/update cache entry — best-effort, don't let a DB error abort the response
+    try {
+      const db = await readDb()
+      const existingIdx = db.recipeCache.findIndex(c => c.cacheKey === cacheKey)
+      const entry = {
+        id: existingIdx >= 0 ? db.recipeCache[existingIdx].id : randomUUID(),
+        cacheKey,
+        meal: meal.trim(),
+        allergens: avoidList || [],
+        recipe,
+        createdAt: existingIdx >= 0 ? db.recipeCache[existingIdx].createdAt : new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        hitCount: existingIdx >= 0 ? (db.recipeCache[existingIdx].hitCount || 0) : 0,
+      }
+      if (existingIdx >= 0) {
+        db.recipeCache[existingIdx] = entry
+      } else {
+        db.recipeCache.push(entry)
+      }
+      db.stats.apiCalls = (db.stats.apiCalls || 0) + 1
+      await writeDb(db)
+      console.log(`API call: "${meal}" — cache now has ${db.recipeCache.length} entries`)
+    } catch (dbErr) {
+      console.error('DB error saving cache (recipe still returned):', dbErr.message)
     }
-    if (existingIdx >= 0) {
-      db.recipeCache[existingIdx] = entry
-    } else {
-      db.recipeCache.push(entry)
-    }
-    db.stats.apiCalls = (db.stats.apiCalls || 0) + 1
-    await writeDb(db)
-
-    console.log(`API call: "${meal}" — cache now has ${db.recipeCache.length} entries`)
     res.write(`data: ${JSON.stringify({ done: true, recipe, _fromCache: false })}\n\n`)
     res.end()
   } catch (err) {
@@ -377,6 +405,17 @@ app.get('/api/admin/stats', async (req, res) => {
       .sort((a, b) => (b.hitCount || 0) - (a.hitCount || 0))
       .map(({ meal, allergens, hitCount, createdAt, updatedAt }) => ({ meal, allergens, hitCount, createdAt, updatedAt })),
   })
+})
+
+// ─── Global error handler ──────────────────────────────────────────────────────
+// Catches any unhandled exceptions thrown inside route handlers and ensures the
+// response is always JSON — never an Express HTML error page.
+
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  console.error('Unhandled server error:', err)
+  if (res.headersSent) return // response already started (e.g. mid-SSE stream)
+  res.status(500).json({ error: err.message || 'Internal server error.' })
 })
 
 // Fallback to index.html for SPA routing in production (local only)

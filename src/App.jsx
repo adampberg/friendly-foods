@@ -27,6 +27,23 @@ export default function App() {
   const { saved, saveRecipe, isRecipeSaved, deleteRecipe, renameRecipe } = useSavedRecipes()
   const [activeProfileName, setActiveProfileName] = useState(null)
 
+  // Extracts a human-readable error message from a non-ok fetch response,
+  // gracefully handling cases where the body isn't valid JSON (e.g. Vercel
+  // gateway errors that return HTML or plain text).
+  const extractErrorMessage = async (res) => {
+    try {
+      const data = await res.json()
+      return data.error || `Server error (${res.status})`
+    } catch {
+      // Body wasn't JSON — log it for debugging and return a generic message
+      try {
+        const text = await res.text()
+        console.error('Non-JSON error response:', text.slice(0, 300))
+      } catch {}
+      return `Server error (${res.status}). Please try again.`
+    }
+  }
+
   // Reads an SSE stream from the recipe endpoint and returns { recipe, _fromCache }
   const readRecipeStream = async (res) => {
     const reader = res.body.getReader()
@@ -45,9 +62,14 @@ export default function App() {
       for (const part of parts) {
         const line = part.trim()
         if (!line.startsWith('data: ')) continue
-        const data = JSON.parse(line.slice(6))
-        if (data.error) throw new Error(data.error)
-        if (data.done) return { recipe: data.recipe, _fromCache: data._fromCache ?? false }
+        try {
+          const data = JSON.parse(line.slice(6))
+          if (data.error) throw new Error(data.error)
+          if (data.done) return { recipe: data.recipe, _fromCache: data._fromCache ?? false }
+        } catch (e) {
+          // Re-throw intentional errors; skip malformed SSE lines
+          if (e.message && !e.message.startsWith('JSON')) throw e
+        }
       }
     }
 
@@ -69,8 +91,7 @@ export default function App() {
       })
 
       if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Something went wrong. Please try again.')
+        throw new Error(await extractErrorMessage(res))
       }
 
       const { recipe: recipeData, _fromCache } = await readRecipeStream(res)
@@ -98,8 +119,7 @@ export default function App() {
         body: JSON.stringify({ meal: lastMeal, avoidList: lastAvoidList, force: true }),
       })
       if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Something went wrong. Please try again.')
+        throw new Error(await extractErrorMessage(res))
       }
       const { recipe: recipeData } = await readRecipeStream(res)
       setRecipe(recipeData)
