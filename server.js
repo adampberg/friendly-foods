@@ -44,6 +44,7 @@ function requireAuth(req, res, next) {
 // ─── Auth routes ───────────────────────────────────────────────────────────────
 
 app.post('/api/auth/register', async (req, res) => {
+  console.log('[AUTH] POST /api/auth/register — email:', req.body?.email)
   const { username, email, password } = req.body
   if (!username || !email || !password) {
     return res.status(400).json({ error: 'Username, email, and password are required.' })
@@ -52,52 +53,67 @@ app.post('/api/auth/register', async (req, res) => {
     return res.status(400).json({ error: 'Password must be at least 6 characters.' })
   }
 
-  const db = await readDb()
-  const existing = db.users.find(u => u.email.toLowerCase() === email.toLowerCase())
-  if (existing) {
-    return res.status(409).json({ error: 'An account with that email already exists.' })
-  }
+  try {
+    const db = await readDb()
+    const existing = db.users.find(u => u.email.toLowerCase() === email.toLowerCase())
+    if (existing) {
+      return res.status(409).json({ error: 'An account with that email already exists.' })
+    }
 
-  const passwordHash = await bcrypt.hash(password, 10)
-  const user = {
-    id: randomUUID(),
-    username: username.trim(),
-    email: email.toLowerCase().trim(),
-    passwordHash,
-    createdAt: new Date().toISOString(),
-  }
-  db.users.push(user)
-  await writeDb(db)
+    const passwordHash = await bcrypt.hash(password, 10)
+    const user = {
+      id: randomUUID(),
+      username: username.trim(),
+      email: email.toLowerCase().trim(),
+      passwordHash,
+      createdAt: new Date().toISOString(),
+    }
+    db.users.push(user)
+    await writeDb(db)
 
-  const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '30d' })
-  res.status(201).json({
-    token,
-    user: { id: user.id, username: user.username, email: user.email },
-  })
+    console.log('[AUTH] Register success for:', email)
+    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '30d' })
+    res.status(201).json({
+      token,
+      user: { id: user.id, username: user.username, email: user.email },
+    })
+  } catch (err) {
+    console.error('[AUTH] Register error:', err.message)
+    res.status(500).json({ error: 'Failed to create account. Please try again.' })
+  }
 })
 
 app.post('/api/auth/login', async (req, res) => {
+  console.log('[AUTH] POST /api/auth/login — email:', req.body?.email)
   const { email, password } = req.body
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required.' })
   }
 
-  const db = await readDb()
-  const user = db.users.find(u => u.email.toLowerCase() === email.toLowerCase().trim())
-  if (!user) {
-    return res.status(401).json({ error: 'Invalid email or password.' })
-  }
+  try {
+    const db = await readDb()
+    const user = db.users.find(u => u.email.toLowerCase() === email.toLowerCase().trim())
+    if (!user) {
+      console.log('[AUTH] Login failed — no user found for:', email)
+      return res.status(401).json({ error: 'Invalid email or password.' })
+    }
 
-  const match = await bcrypt.compare(password, user.passwordHash)
-  if (!match) {
-    return res.status(401).json({ error: 'Invalid email or password.' })
-  }
+    const match = await bcrypt.compare(password, user.passwordHash)
+    if (!match) {
+      console.log('[AUTH] Login failed — wrong password for:', email)
+      return res.status(401).json({ error: 'Invalid email or password.' })
+    }
 
-  const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '30d' })
-  res.json({
-    token,
-    user: { id: user.id, username: user.username, email: user.email },
-  })
+    console.log('[AUTH] Login success for:', email)
+    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '30d' })
+    res.json({
+      token,
+      user: { id: user.id, username: user.username, email: user.email },
+    })
+  } catch (err) {
+    console.error('[AUTH] Login error:', err.message)
+    res.status(500).json({ error: 'Failed to log in. Please try again.' })
+  }
 })
 
 // ─── Profile routes ────────────────────────────────────────────────────────────

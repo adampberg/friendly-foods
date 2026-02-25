@@ -15,8 +15,11 @@ async function getCollection() {
     if (!process.env.MONGODB_URI) {
       throw new Error('MONGODB_URI environment variable is not set')
     }
-    cachedClient = new MongoClient(process.env.MONGODB_URI)
-    await cachedClient.connect()
+    console.log('[DB] Connecting to MongoDB...')
+    const client = new MongoClient(process.env.MONGODB_URI)
+    await client.connect() // only cache after a successful connect
+    cachedClient = client
+    console.log('[DB] MongoDB connected successfully')
   }
   return cachedClient.db('friendly-foods').collection('appdata')
 }
