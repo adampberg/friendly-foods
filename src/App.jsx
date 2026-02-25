@@ -27,6 +27,33 @@ export default function App() {
   const { saved, saveRecipe, isRecipeSaved, deleteRecipe, renameRecipe } = useSavedRecipes()
   const [activeProfileName, setActiveProfileName] = useState(null)
 
+  // Reads an SSE stream from the recipe endpoint and returns { recipe, _fromCache }
+  const readRecipeStream = async (res) => {
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+      // SSE events are separated by double newlines
+      const parts = buffer.split('\n\n')
+      buffer = parts.pop() // keep any incomplete trailing chunk
+
+      for (const part of parts) {
+        const line = part.trim()
+        if (!line.startsWith('data: ')) continue
+        const data = JSON.parse(line.slice(6))
+        if (data.error) throw new Error(data.error)
+        if (data.done) return { recipe: data.recipe, _fromCache: data._fromCache ?? false }
+      }
+    }
+
+    throw new Error('Connection closed before a recipe was returned. Please try again.')
+  }
+
   const handleGenerate = async (meal, avoidList) => {
     setLoading(true)
     setError(null)
@@ -41,15 +68,14 @@ export default function App() {
         body: JSON.stringify({ meal, avoidList }),
       })
 
-      const data = await res.json()
-
       if (!res.ok) {
+        const data = await res.json()
         throw new Error(data.error || 'Something went wrong. Please try again.')
       }
 
-      const { _fromCache, ...recipeData } = data
+      const { recipe: recipeData, _fromCache } = await readRecipeStream(res)
       setRecipe(recipeData)
-      setRecipeFromCache(_fromCache ?? false)
+      setRecipeFromCache(_fromCache)
 
       // Smooth scroll to results
       setTimeout(() => {
@@ -71,9 +97,11 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ meal: lastMeal, avoidList: lastAvoidList, force: true }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Something went wrong. Please try again.')
-      const { _fromCache, ...recipeData } = data
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Something went wrong. Please try again.')
+      }
+      const { recipe: recipeData } = await readRecipeStream(res)
       setRecipe(recipeData)
       setRecipeFromCache(false)
     } catch (err) {

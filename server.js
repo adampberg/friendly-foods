@@ -245,11 +245,14 @@ app.post('/api/recipe', async (req, res) => {
       db.stats.cacheHits = (db.stats.cacheHits || 0) + 1
       await writeDb(db)
       console.log(`Cache hit: "${meal}"`)
-      return res.json({ ...cached.recipe, _fromCache: true })
+      res.setHeader('Content-Type', 'text/event-stream')
+      res.setHeader('Cache-Control', 'no-cache')
+      res.write(`data: ${JSON.stringify({ done: true, recipe: cached.recipe, _fromCache: true })}\n\n`)
+      return res.end()
     }
   }
 
-  // Cache miss (or forced) — call the API
+  // Cache miss (or forced) — stream from the Anthropic API
   const avoidText = avoidList && avoidList.length > 0 ? avoidList.join(', ') : 'none'
 
   const prompt = `You are a helpful recipe assistant specializing in allergy-friendly cooking.
@@ -283,17 +286,31 @@ Important rules:
 - Keep instructions clear and beginner-friendly
 - Return ONLY the JSON object, no markdown, no extra text`
 
+  // Start SSE response immediately so the connection stays open
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+  res.flushHeaders()
+
+  let fullText = ''
+
   try {
-    const message = await client.messages.create({
+    const stream = client.messages.stream({
       model: 'claude-opus-4-5',
       max_tokens: 2048,
       messages: [{ role: 'user', content: prompt }],
     })
 
-    const raw = message.content[0].text.trim()
+    for await (const event of stream) {
+      if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+        fullText += event.delta.text
+        res.write(`data: ${JSON.stringify({ chunk: event.delta.text })}\n\n`)
+      }
+    }
 
     // Strip markdown code fences if Claude included them despite instructions
-    const content = raw
+    const content = fullText
+      .trim()
       .replace(/^```(?:json)?\s*/i, '')
       .replace(/\s*```$/, '')
       .trim()
@@ -322,16 +339,17 @@ Important rules:
     await writeDb(db)
 
     console.log(`API call: "${meal}" — cache now has ${db.recipeCache.length} entries`)
-    res.json({ ...recipe, _fromCache: false })
+    res.write(`data: ${JSON.stringify({ done: true, recipe, _fromCache: false })}\n\n`)
+    res.end()
   } catch (err) {
     if (err instanceof SyntaxError) {
       console.error('Failed to parse Claude response as JSON:', err.message)
-      return res.status(500).json({ error: 'Received an unexpected response format. Please try again.' })
+      res.write(`data: ${JSON.stringify({ error: 'Received an unexpected response format. Please try again.' })}\n\n`)
+    } else {
+      console.error('Anthropic API error:', err)
+      res.write(`data: ${JSON.stringify({ error: err.message || 'Failed to generate recipe. Please try again.' })}\n\n`)
     }
-    console.error('Anthropic API error:', err)
-    const status = err.status || 500
-    const message = err.message || 'Failed to generate recipe. Please try again.'
-    res.status(status).json({ error: message })
+    res.end()
   }
 })
 
