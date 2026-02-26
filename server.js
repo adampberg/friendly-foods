@@ -241,6 +241,12 @@ function makeCacheKey(meal, allergens) {
   return `${normalizedMeal}|${sortedAllergens}`
 }
 
+function makeConvertCacheKey(recipeText, allergens) {
+  const normalizedText = recipeText.trim().toLowerCase().replace(/\s+/g, ' ')
+  const sortedAllergens = (allergens || []).map(a => a.trim().toLowerCase()).sort().join(',')
+  return `convert|${normalizedText}|${sortedAllergens}`
+}
+
 // ─── Health endpoint ────────────────────────────────────────────────────────────
 
 app.get('/api/health', (req, res) => {
@@ -412,6 +418,152 @@ Important rules:
     } else {
       console.error('Anthropic API error:', err)
       res.write(`data: ${JSON.stringify({ error: err.message || 'Failed to generate recipe. Please try again.' })}\n\n`)
+    }
+    res.end()
+  }
+})
+
+// ─── Convert recipe route ──────────────────────────────────────────────────────
+
+app.post('/api/convert-recipe', async (req, res) => {
+  const { recipeText, avoidList, force } = req.body
+
+  if (!recipeText || !recipeText.trim()) {
+    return res.status(400).json({ error: 'Recipe text is required.' })
+  }
+
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.error('ANTHROPIC_API_KEY is not set')
+    return res.status(503).json({ error: 'Server configuration error: Anthropic API key is not configured.' })
+  }
+
+  const cacheKey = makeConvertCacheKey(recipeText, avoidList)
+
+  if (!force) {
+    try {
+      const db = await readDb()
+      const cached = db.recipeCache.find(c => c.cacheKey === cacheKey)
+      if (cached) {
+        cached.hitCount = (cached.hitCount || 0) + 1
+        db.stats.cacheHits = (db.stats.cacheHits || 0) + 1
+        await writeDb(db)
+        console.log(`Convert cache hit`)
+        res.setHeader('Content-Type', 'text/event-stream')
+        res.setHeader('Cache-Control', 'no-cache')
+        res.write(`data: ${JSON.stringify({ done: true, recipe: cached.recipe, _fromCache: true })}\n\n`)
+        return res.end()
+      }
+    } catch (dbErr) {
+      console.error('DB error during convert cache check, proceeding without cache:', dbErr.message)
+    }
+  }
+
+  const avoidText = avoidList && avoidList.length > 0 ? avoidList.join(', ') : 'none'
+
+  const prompt = `You are a helpful recipe assistant specializing in allergy-friendly cooking.
+
+The user has a recipe they want converted to be allergy-friendly. Here is the original recipe:
+
+--- ORIGINAL RECIPE ---
+${recipeText.trim()}
+--- END RECIPE ---
+
+Allergens/ingredients to AVOID: ${avoidText}
+
+Analyze the original recipe and create an allergy-friendly version by replacing any ingredients that contain the specified allergens with safe alternatives. Preserve the original recipe's structure, flavors, and character as closely as possible.
+
+Respond with valid JSON in exactly this format:
+{
+  "title": "Allergy-Friendly [original recipe name]",
+  "servings": "servings from original recipe, or infer if not stated",
+  "prepTime": "prep time from original, or infer if not stated",
+  "cookTime": "cook time from original, or infer if not stated",
+  "ingredients": [
+    { "amount": "1 cup", "item": "ingredient name" }
+  ],
+  "instructions": [
+    "Step 1: ...",
+    "Step 2: ..."
+  ],
+  "substitutions": [
+    { "original": "butter", "substitute": "coconut oil", "reason": "dairy-free alternative; use same quantity" }
+  ],
+  "allergenNote": "A brief paragraph confirming this recipe avoids the listed allergens and any general safety tips."
+}
+
+Important rules:
+- Only replace ingredients that actually contain the avoided allergens — do not make unnecessary changes
+- If an allergen is listed but genuinely not present in the recipe, leave those ingredients alone
+- Adjust ingredient amounts if the substitution requires it (e.g., oil-to-butter ratios)
+- Update instructions to reflect any method changes the substitution requires (e.g., different melting behavior)
+- Note any changes to cooking time or temperature in the relevant instruction step
+- Only list substitutions that were actually made; use an empty array if none were needed
+- Keep instructions clear and numbered
+- Return ONLY the JSON object, no markdown, no extra text`
+
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+  res.flushHeaders()
+
+  let fullText = ''
+
+  try {
+    const stream = client.messages.stream({
+      model: 'claude-opus-4-5',
+      max_tokens: 2048,
+      messages: [{ role: 'user', content: prompt }],
+    })
+
+    for await (const event of stream) {
+      if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+        fullText += event.delta.text
+        res.write(`data: ${JSON.stringify({ chunk: event.delta.text })}\n\n`)
+      }
+    }
+
+    const content = fullText
+      .trim()
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```$/, '')
+      .trim()
+
+    const recipe = JSON.parse(content)
+
+    try {
+      const db = await readDb()
+      const existingIdx = db.recipeCache.findIndex(c => c.cacheKey === cacheKey)
+      const entry = {
+        id: existingIdx >= 0 ? db.recipeCache[existingIdx].id : randomUUID(),
+        cacheKey,
+        meal: `[convert] ${recipeText.trim().split('\n')[0].slice(0, 80)}`,
+        allergens: avoidList || [],
+        recipe,
+        createdAt: existingIdx >= 0 ? db.recipeCache[existingIdx].createdAt : new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        hitCount: existingIdx >= 0 ? (db.recipeCache[existingIdx].hitCount || 0) : 0,
+      }
+      if (existingIdx >= 0) {
+        db.recipeCache[existingIdx] = entry
+      } else {
+        db.recipeCache.push(entry)
+      }
+      db.stats.apiCalls = (db.stats.apiCalls || 0) + 1
+      await writeDb(db)
+      console.log(`Convert API call — cache now has ${db.recipeCache.length} entries`)
+    } catch (dbErr) {
+      console.error('DB error saving convert cache (recipe still returned):', dbErr.message)
+    }
+
+    res.write(`data: ${JSON.stringify({ done: true, recipe, _fromCache: false })}\n\n`)
+    res.end()
+  } catch (err) {
+    if (err instanceof SyntaxError) {
+      console.error('Failed to parse Claude convert response as JSON:', err.message)
+      res.write(`data: ${JSON.stringify({ error: 'Received an unexpected response format. Please try again.' })}\n\n`)
+    } else {
+      console.error('Anthropic API error (convert):', err)
+      res.write(`data: ${JSON.stringify({ error: err.message || 'Failed to convert recipe. Please try again.' })}\n\n`)
     }
     res.end()
   }

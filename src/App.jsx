@@ -5,6 +5,7 @@ import RecipeDisplay from './components/RecipeDisplay.jsx'
 import AuthModal from './components/AuthModal.jsx'
 import SaveRecipeModal from './components/SaveRecipeModal.jsx'
 import MyRecipes from './components/MyRecipes.jsx'
+import RecipeConverter from './components/RecipeConverter.jsx'
 import AdminPage from './components/AdminPage.jsx'
 import { useSavedRecipes } from './hooks/useSavedRecipes.js'
 import { useAuth } from './AuthContext.jsx'
@@ -176,6 +177,12 @@ export default function App() {
             Recipe Generator
           </button>
           <button
+            className={`nav-tab ${activeTab === 'converter' ? 'active' : ''}`}
+            onClick={() => setActiveTab('converter')}
+          >
+            Recipe Converter
+          </button>
+          <button
             className={`nav-tab ${activeTab === 'my-recipes' ? 'active' : ''}`}
             onClick={() => setActiveTab('my-recipes')}
           >
@@ -186,7 +193,7 @@ export default function App() {
       </nav>
 
       <main className="main">
-        {activeTab === 'generator' ? (
+        {activeTab === 'generator' && (
           <>
             <RecipeForm onGenerate={handleGenerate} loading={loading} onOpenAuth={() => setShowAuthModal(true)} onProfileSelect={setActiveProfileName} />
 
@@ -223,7 +230,17 @@ export default function App() {
               </div>
             )}
           </>
-        ) : (
+        )}
+
+        {activeTab === 'converter' && (
+          <RecipeConverter
+            onOpenAuth={() => setShowAuthModal(true)}
+            saveRecipe={saveRecipe}
+            isRecipeSaved={isRecipeSaved}
+          />
+        )}
+
+        {activeTab === 'my-recipes' && (
           <MyRecipes
             saved={saved}
             onDelete={deleteRecipe}
