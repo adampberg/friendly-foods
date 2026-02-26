@@ -136,6 +136,11 @@ export default function App() {
     saveRecipe(recipe, title)
   }
 
+  const handleTabClick = (tab, e) => {
+    setActiveTab(tab)
+    e.currentTarget.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+  }
+
   const cleanRecipeTitle = recipe?.title?.replace(/^Allergy-Friendly\s+/i, '') ?? ''
   const defaultSaveTitle = recipe
     ? activeProfileName
@@ -172,19 +177,19 @@ export default function App() {
         <div className="app-nav-inner">
           <button
             className={`nav-tab ${activeTab === 'generator' ? 'active' : ''}`}
-            onClick={() => setActiveTab('generator')}
+            onClick={(e) => handleTabClick('generator', e)}
           >
             Recipe Generator
           </button>
           <button
             className={`nav-tab ${activeTab === 'converter' ? 'active' : ''}`}
-            onClick={() => setActiveTab('converter')}
+            onClick={(e) => handleTabClick('converter', e)}
           >
             Recipe Converter
           </button>
           <button
             className={`nav-tab ${activeTab === 'my-recipes' ? 'active' : ''}`}
-            onClick={() => setActiveTab('my-recipes')}
+            onClick={(e) => handleTabClick('my-recipes', e)}
           >
             My Recipes
             {saved.length > 0 && <span className="nav-badge">{saved.length}</span>}
